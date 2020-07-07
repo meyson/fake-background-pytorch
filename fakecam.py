@@ -5,7 +5,7 @@ import time
 import argparse
 import os
 
-from ml.datasets.default_augmentations import get_preprocessing_fn
+from ml.datasets.default_augmentations import get_test_preprocessing
 from ml.inference import get_mask
 from ml.models import load_from_name
 
@@ -106,7 +106,7 @@ def main():
     if args.model_path is None:
         args.model_path = os.path.join('ml', 'models', 'saved', args.model_name) + '.pth'
     model = load_from_name(model_name=args.model_name, mode='eval', path=args.model_path)
-    augs = get_preprocessing_fn(model_name=args.model_name)
+    augs = get_test_preprocessing(model_name=args.model_name)
 
     # load the virtual background
     background = cv2.imread(args.background)

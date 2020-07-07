@@ -76,7 +76,7 @@ def get_preprocessing(preprocessing_fn):
 
 
 # processing function for inference
-def get_preprocessing_fn(model_name='mobilenet_v2', height=480, width=640):
+def get_test_preprocessing(model_name='mobilenet_v2', height=480, width=640):
     if model_name == 'mobilenet_v2':
         preprocess_fn = smp.encoders.get_preprocessing_fn(model_name, 'imagenet')
         return A.Compose([
