@@ -1,25 +1,19 @@
-import argparse
+import os
 
-import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 import torch.optim as optim
-import numpy as np
-import segmentation_models_pytorch as smp
-# FIXME
-from utils import *
 from datasets.default_augmentations import *
 from datasets import CocoSegnentation
+from models.models import load_from_name
 
+MODEL_NAME = 'mobilenet_v2'
 ENCODER = 'mobilenet_v2'
 ENCODER_WEIGHTS = 'imagenet'
-# CLASSES = ['person']
-# TODO
 ACTIVATION = 'sigmoid'  # could be None for logits or 'softmax2d' for multicalss segmentation
+
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-# DEVICE = 'cpu'
-EPOCH = 40
-BATCH_SIZE = 1
+EPOCH = 10
+BATCH_SIZE = 20
 
 if DEVICE == 'cuda':
     torch.backends.cudnn.benchmark = True
@@ -27,15 +21,9 @@ if DEVICE == 'cuda':
 
 def main():
     # create segmentation model with pretrained encoder
-    model = smp.FPN(
-        encoder_name=ENCODER,
-        encoder_weights=ENCODER_WEIGHTS,
-        classes=1,
-        activation=ACTIVATION,
-    )
+    model = load_from_name(model_name=MODEL_NAME, mode='train')
 
     print(model)
-    print(f'N of parameters = {(count_parameters(model) / 10**6):.2f}m')
 
     preprocessing_fn = smp.encoders.get_preprocessing_fn(ENCODER, ENCODER_WEIGHTS)
     preprocessing = get_preprocessing(preprocessing_fn)
@@ -54,8 +42,8 @@ def main():
     valid_dataset = CocoSegnentation(coco_root + 'val2017', coco_ann, coco_ann_valid,
                                      augmentation=valid_augs, preprocessing=preprocessing)
 
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
-    valid_loader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False,  num_workers=4)
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=8)
+    valid_loader = DataLoader(valid_dataset, batch_size=4, shuffle=False, pin_memory=True, num_workers=4)
 
     loss = smp.utils.losses.DiceLoss()
     metrics = [
@@ -66,7 +54,7 @@ def main():
         dict(params=model.parameters(), lr=0.001),
     ])
 
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.4, patience=5)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, EPOCH)
 
     # create epoch runners
     # it is a simple loop of iterating over dataloader`s samples
@@ -89,19 +77,18 @@ def main():
 
     # train model for 40 epochs
     max_score = 0
-    for i in range(0, 5):
+    for i in range(0, EPOCH):
         print('\nEpoch: {}'.format(i))
         train_logs = train_epoch.run(train_loader)
         valid_logs = valid_epoch.run(valid_loader)
 
         if max_score < valid_logs['iou_score']:
             max_score = valid_logs['iou_score']
-            torch.save(model.state_dict(), 'saved/best_model.pth')
+            path = os.path.join('ml', 'models', 'saved', f'{MODEL_NAME}.pth')
+            torch.save(model.state_dict(), path)
             print('Model saved!')
 
-            optimizer.param_groups[0]['lr'] = 1e-4
-
-        # scheduler.step(valid_logs['iou_score'])
+        scheduler.step()
 
 
 if __name__ == '__main__':
