@@ -4,6 +4,7 @@ import pyfakewebcam
 import time
 import argparse
 import os
+import functools
 
 from ml.datasets.default_augmentations import get_test_preprocessing
 from ml.inference import get_mask
@@ -65,8 +66,9 @@ def hologram_effect(img):
 
 # Decorator to measure the execution time of methods
 # https://medium.com/pythonhive/python-decorator-to-measure-the-execution-time-of-methods-fa04cb6bb36d
-# Here I use time.perf_counter() since it's more accurate
+# Here I'm using time.perf_counter() since it's more accurate
 def timeit(method):
+    @functools.wraps(method)
     def timed(*args, **kw):
         ts = time.perf_counter()
         result = method(*args, **kw)
